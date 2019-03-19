@@ -1,2 +1,2 @@
 # dubbo-test-tool
-simple dubbo api test tool
+Simple dubbo api test tool

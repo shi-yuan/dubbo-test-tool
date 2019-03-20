@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.http.MediaType;
-import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -76,9 +75,13 @@ public class Application {
                 return FileVisitResult.CONTINUE;
             }
         });
-        List<Object> args = Optional.ofNullable(api.getArgs()).orElse(Collections.emptyList());
-        try (URLClassLoader cl = new URLClassLoader(urls.toArray(new URL[0]), Thread.currentThread().getContextClassLoader())) {
-            Method invokeMethod = findMethod(ClassUtils.forName(api.getService(), cl), api.getMethod(), args);
+
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        try (URLClassLoader cl = new URLClassLoader(urls.toArray(new URL[0]), contextClassLoader)) {
+            Thread.currentThread().setContextClassLoader(cl);
+
+            List<Object> args = Optional.ofNullable(api.getArgs()).orElse(Collections.emptyList());
+            Method invokeMethod = findMethod(ReflectUtils.forName(api.getService()), api.getMethod(), args);
             if (invokeMethod != null) {
                 Object[] array = PojoUtils.realize(args.toArray(), invokeMethod.getParameterTypes(), invokeMethod.getGenericParameterTypes());
 
@@ -118,6 +121,8 @@ public class Application {
             LOG.error("failed to invoke method[{}.{}]: {}", api.getService(), api.getMethod(), t);
 
             return "Failed to invoke method[" + api.getService() + "." + api.getMethod() + "], cause: " + com.alibaba.dubbo.common.utils.StringUtils.toString(t);
+        } finally {
+            Thread.currentThread().setContextClassLoader(contextClassLoader);
         }
     }
 

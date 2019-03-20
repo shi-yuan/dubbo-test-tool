@@ -17,6 +17,7 @@ import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.validation.Valid;
@@ -45,7 +46,7 @@ public class Application {
     }
 
     @PostMapping(value = "/dubbo/test", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public Object testDubboApi(@RequestBody @Valid ApiVM api) throws Exception {
+    public Object testDubboApi(@RequestBody @Valid ApiVM api, @RequestParam(value = "_force", defaultValue = "false") boolean force) throws Exception {
         if (!StringUtils.hasText(api.getName())) {
             api.setName(APPLICATION_NAME);
             LOG.info("use default application name: {}", APPLICATION_NAME);
@@ -60,7 +61,7 @@ public class Application {
 
         //
         String[] arr = com.alibaba.dubbo.common.utils.StringUtils.split(api.getDependency(), ':');
-        Path artifactPath = ArtifactUtils.download("repository", arr[0], arr[1], arr[2]);
+        Path artifactPath = ArtifactUtils.download(force, "repository", arr[0], arr[1], arr[2]);
 
         //
         List<URL> urls = new LinkedList<>();

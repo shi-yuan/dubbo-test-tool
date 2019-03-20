@@ -15,14 +15,34 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
 
 public class ArtifactUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(ArtifactUtils.class);
 
-    public static Path download(String localRepository, String groupId, String artifactId, String version) throws IOException {
+    public static Path download(boolean force, String localRepository, String groupId, String artifactId, String version) throws IOException {
         Path path = Paths.get(localRepository, StringUtils.split(groupId, '.')).resolve(artifactId).resolve(version);
-        if (!Files.exists(path)) {
+
+        List<String> commands = new LinkedList<>();
+        if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+            commands.add("cmd");
+            commands.add("/c");
+        }
+        commands.addAll(Arrays.asList("mvn", "-f", "pom.xml"));
+
+        if (force) {
+            commands.add("dependency:purge-local-repository");
+            if (Files.exists(path)) {
+                boolean ret = FileSystemUtils.deleteRecursively(path);
+                LOG.info("force download[{}:{}:{}], delete original directory[{}]: {}", groupId, artifactId, version, path, ret);
+            }
+        }
+
+        commands.add("dependency:copy-dependencies");
+
+        if (force || !Files.exists(path)) {
             Path dir = Files.createTempDirectory(null);
             LOG.info("prepare to download artifact[{}:{}:{}] after creating temp directory[{}]", groupId, artifactId, version, dir);
             try {
@@ -35,11 +55,8 @@ public class ArtifactUtils {
                         StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
                 try {
                     Files.createDirectories(path);
-                    if (System.getProperty("os.name").toLowerCase().contains("windows")) {
-                        execute(dir.toFile(), "cmd", "/c", "mvn", "-f", "pom.xml", "dependency:copy-dependencies", "-DoutputDirectory=" + path.toFile().getAbsolutePath());
-                    } else {
-                        execute(dir.toFile(), "mvn", "-f", "pom.xml", "dependency:copy-dependencies", "-DoutputDirectory=" + path.toFile().getAbsolutePath());
-                    }
+                    commands.add("-DoutputDirectory=" + path.toFile().getAbsolutePath());
+                    execute(dir.toFile(), commands.toArray(new String[0]));
                 } catch (Exception ex) {
                     FileSystemUtils.deleteRecursively(path);
                     throw new IllegalStateException(ex);

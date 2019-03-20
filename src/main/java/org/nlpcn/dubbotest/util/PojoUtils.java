@@ -20,8 +20,28 @@ import com.alibaba.dubbo.common.utils.ClassHelper;
 import com.alibaba.dubbo.common.utils.CompatibleTypeUtils;
 import com.alibaba.dubbo.common.utils.ReflectUtils;
 
-import java.lang.reflect.*;
-import java.util.*;
+import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Proxy;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Hashtable;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Properties;
+import java.util.TreeMap;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
@@ -137,7 +157,7 @@ public class PojoUtils {
         }
 
         if (result == null) {
-            result = new HashMap<>();
+            result = new HashMap<Object, Object>();
         }
 
         return result;
@@ -153,8 +173,10 @@ public class PojoUtils {
             return Enum.valueOf((Class<Enum>) type, (String) pojo);
         }
 
-        if (ReflectUtils.isPrimitives(pojo.getClass()) && !(type != null && type.isArray() && type.getComponentType()
-                .isEnum() && pojo.getClass() == String[].class)) {
+        if (ReflectUtils.isPrimitives(pojo.getClass())
+            && !(type != null && type.isArray()
+            && type.getComponentType().isEnum()
+            && pojo.getClass() == String[].class)) {
             return CompatibleTypeUtils.compatibleTypeConvert(pojo, type);
         }
 
@@ -179,7 +201,7 @@ public class PojoUtils {
                 }
                 return dest;
             } else {
-                Class<?> ctype = type.isArray() ? type.getComponentType() : pojo.getClass().getComponentType();
+                Class<?> ctype = (type != null && type.isArray() ? type.getComponentType() : pojo.getClass().getComponentType());
                 int len = Array.getLength(pojo);
                 Object dest = Array.newInstance(ctype, len);
                 history.put(pojo, dest);
@@ -280,18 +302,13 @@ public class PojoUtils {
                         valueClazz = entry.getValue() == null ? null : entry.getValue().getClass();
                     }
 
-                    Object key =
-                            keyClazz == null ? entry.getKey() : realize0(entry.getKey(), keyClazz, keyType, history);
-                    Object value = valueClazz == null ?
-                            entry.getValue() :
-                            realize0(entry.getValue(), valueClazz, valueType, history);
+                    Object key = keyClazz == null ? entry.getKey() : realize0(entry.getKey(), keyClazz, keyType, history);
+                    Object value = valueClazz == null ? entry.getValue() : realize0(entry.getValue(), valueClazz, valueType, history);
                     result.put(key, value);
                 }
                 return result;
             } else if (type.isInterface()) {
-                Object dest = Proxy
-                        .newProxyInstance(Thread.currentThread().getContextClassLoader(), new Class<?>[]{type},
-                                new PojoInvocationHandler(map));
+                Object dest = Proxy.newProxyInstance(Thread.currentThread().getContextClassLoader(), new Class<?>[]{type}, new PojoInvocationHandler(map));
                 history.put(pojo, dest);
                 return dest;
             } else {
@@ -314,19 +331,15 @@ public class PojoUtils {
                                     method.invoke(dest, value);
                                 } catch (Exception e) {
                                     e.printStackTrace();
-                                    throw new RuntimeException(
-                                            "Failed to set pojo " + dest.getClass().getSimpleName() + " property " + name
-                                                    + " value " + value + "(" + value.getClass() + "), cause: " + e
-                                                    .getMessage(), e);
+                                    throw new RuntimeException("Failed to set pojo " + dest.getClass().getSimpleName() + " property " + name
+                                        + " value " + value + "(" + value.getClass() + "), cause: " + e.getMessage(), e);
                                 }
                             } else if (field != null) {
                                 value = realize0(value, field.getType(), field.getGenericType(), history);
                                 try {
                                     field.set(dest, value);
                                 } catch (IllegalAccessException e) {
-                                    throw new RuntimeException(
-                                            "Failed to set filed " + name + " of pojo " + dest.getClass().getName() + " : "
-                                                    + e.getMessage(), e);
+                                    throw new RuntimeException("Failed to set filed " + name + " of pojo " + dest.getClass().getName() + " : " + e.getMessage(), e);
                                 }
                             }
                         }
@@ -391,7 +404,11 @@ public class PojoUtils {
                 }
                 constructor.setAccessible(true);
                 return constructor.newInstance(new Object[constructor.getParameterTypes().length]);
-            } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
+            } catch (InstantiationException e) {
+                throw new RuntimeException(e.getMessage(), e);
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException(e.getMessage(), e);
+            } catch (InvocationTargetException e) {
                 throw new RuntimeException(e.getMessage(), e);
             }
         }

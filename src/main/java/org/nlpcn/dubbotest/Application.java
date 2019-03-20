@@ -140,6 +140,15 @@ public class Application {
         for (int i = 0; i < types.length; i++) {
             Class<?> type = types[i];
             Object arg = args.get(i);
+
+            if (arg == null) {
+                if (type.isPrimitive()) {
+                    throw new NullPointerException(String.format("The type of No.%d parameter is primitive(%s), but the value passed is null.", i + 1, type.getName()));
+                }
+
+                continue;
+            }
+
             if (ReflectUtils.isPrimitive(arg.getClass())) {
                 if (!ReflectUtils.isPrimitive(type)) {
                     return false;

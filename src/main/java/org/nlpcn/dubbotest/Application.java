@@ -5,6 +5,8 @@ import com.alibaba.dubbo.config.ApplicationConfig;
 import com.alibaba.dubbo.config.ReferenceConfig;
 import com.alibaba.dubbo.config.RegistryConfig;
 import com.alibaba.dubbo.rpc.service.GenericService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.nlpcn.dubbotest.util.ArtifactUtils;
 import org.nlpcn.dubbotest.util.PojoUtils;
 import org.nlpcn.dubbotest.vm.ApiVM;
@@ -39,6 +41,8 @@ public class Application {
     private static final Logger LOG = LoggerFactory.getLogger(Application.class);
 
     private static final String APPLICATION_NAME = "api-generic-consumer";
+
+    private static final ObjectMapper mapper = new ObjectMapper();
 
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);
@@ -111,14 +115,14 @@ public class Application {
 
                 LOG.info("invoke method[{}.{}], took {}ms", api.getService(), api.getMethod(), System.currentTimeMillis() - start);
 
-                return result;
+                return mapper.readValue(mapper.writeValueAsString(PojoUtils.realize(result, invokeMethod.getReturnType(), invokeMethod.getGenericReturnType())), Object.class);
             } else {
                 LOG.warn("method[{}.{}] not found", api.getService(), api.getMethod());
 
                 return "No such method[" + api.getMethod() + "] in service[" + api.getService() + "]";
             }
         } catch (Throwable t) {
-            LOG.error("failed to invoke method[{}.{}]: {}", api.getService(), api.getMethod(), t);
+            LOG.error("failed to invoke method[{}.{}]: ", api.getService(), api.getMethod(), t);
 
             return "Failed to invoke method[" + api.getService() + "." + api.getMethod() + "], cause: " + com.alibaba.dubbo.common.utils.StringUtils.toString(t);
         } finally {

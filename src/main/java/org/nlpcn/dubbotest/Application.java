@@ -1,11 +1,32 @@
 package org.nlpcn.dubbotest;
 
+import com.alibaba.dubbo.common.utils.ClassHelper;
 import com.alibaba.dubbo.common.utils.ReflectUtils;
 import com.alibaba.dubbo.config.ApplicationConfig;
 import com.alibaba.dubbo.config.ReferenceConfig;
 import com.alibaba.dubbo.config.RegistryConfig;
 import com.alibaba.dubbo.rpc.service.GenericService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import javax.validation.Valid;
 
 import org.nlpcn.dubbotest.util.ArtifactUtils;
 import org.nlpcn.dubbotest.util.PojoUtils;
@@ -20,19 +41,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import javax.validation.Valid;
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
 
 @SpringBootApplication
 @RestController
@@ -85,7 +93,7 @@ public class Application {
             Thread.currentThread().setContextClassLoader(cl);
 
             List<Object> args = Optional.ofNullable(api.getArgs()).orElse(Collections.emptyList());
-            Method invokeMethod = findMethod(ReflectUtils.forName(api.getService()), api.getMethod(), args);
+            Method invokeMethod = findMethod(ClassHelper.forName(api.getService()), api.getMethod(), args);
             if (invokeMethod != null) {
                 Object[] array = PojoUtils.realize(args.toArray(), invokeMethod.getParameterTypes(), invokeMethod.getGenericParameterTypes());
 
@@ -130,7 +138,7 @@ public class Application {
         }
     }
 
-    private Method findMethod(Class<?> iface, String method, List<Object> args) {
+    private Method findMethod(Class<?> iface, String method, List<Object> args) throws ClassNotFoundException {
         Method[] methods = iface.getMethods();
         for (Method m : methods) {
             if (m.getName().equals(method) && isMatch(m.getParameterTypes(), args)) {
@@ -141,7 +149,7 @@ public class Application {
         return null;
     }
 
-    private boolean isMatch(Class<?>[] types, List<Object> args) {
+    private boolean isMatch(Class<?>[] types, List<Object> args) throws ClassNotFoundException {
         if (types.length != args.size()) {
             return false;
         }
@@ -166,7 +174,7 @@ public class Application {
                 String name = (String) ((Map<?, ?>) arg).get("class");
                 Class<?> cls = arg.getClass();
                 if (name != null && name.length() > 0) {
-                    cls = ReflectUtils.forName(name);
+                    cls = ClassHelper.forName(name);
                 }
 
                 if (!type.isAssignableFrom(cls)) {

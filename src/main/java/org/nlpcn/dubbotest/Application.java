@@ -7,27 +7,6 @@ import com.alibaba.dubbo.config.ReferenceConfig;
 import com.alibaba.dubbo.config.RegistryConfig;
 import com.alibaba.dubbo.rpc.service.GenericService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
-import javax.validation.Valid;
-
 import org.nlpcn.dubbotest.util.ArtifactUtils;
 import org.nlpcn.dubbotest.util.PojoUtils;
 import org.nlpcn.dubbotest.vm.ApiVM;
@@ -42,6 +21,26 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.validation.Valid;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 @SpringBootApplication
 @RestController
 public class Application {
@@ -49,6 +48,8 @@ public class Application {
     private static final Logger LOG = LoggerFactory.getLogger(Application.class);
 
     private static final String APPLICATION_NAME = "api-generic-consumer";
+
+    private static final int DEFAULT_TIMEOUT = 20 * 1000;
 
     private static final ObjectMapper mapper = new ObjectMapper();
 
@@ -64,7 +65,10 @@ public class Application {
         }
         if (!StringUtils.hasText(api.getService())) {
             String m = api.getMethod();
-            int i = m.lastIndexOf(".");
+            int i = m.lastIndexOf("#");
+            if (i < 0) {
+                i = m.lastIndexOf(".");
+            }
             api.setService(m.substring(0, i));
             api.setMethod(m.substring(i + 1));
             LOG.info("[service] not found, substing method[{}]：service[{}]，method[{}]", m, api.getService(), api.getMethod());
@@ -113,9 +117,7 @@ public class Application {
                 if (StringUtils.hasText(api.getUrl())) {
                     reference.setUrl(api.getUrl());
                 }
-                if (api.getTimeout() != null) {
-                    reference.setTimeout(api.getTimeout());
-                }
+                reference.setTimeout(Optional.ofNullable(api.getTimeout()).orElse(DEFAULT_TIMEOUT));
 
                 long start = System.currentTimeMillis();
 
@@ -140,9 +142,24 @@ public class Application {
 
     private Method findMethod(Class<?> iface, String method, List<Object> args) throws ClassNotFoundException {
         Method[] methods = iface.getMethods();
+        List<Method> sameSignatureMethods = new ArrayList<>();
+        int size = args.size();
         for (Method m : methods) {
-            if (m.getName().equals(method) && isMatch(m.getParameterTypes(), args)) {
-                return m;
+            if (m.getName().equals(method) && m.getParameterCount() == size) {
+                sameSignatureMethods.add(m);
+            }
+        }
+
+        size = sameSignatureMethods.size();
+        if (size == 1) {
+            return sameSignatureMethods.get(0);
+        }
+
+        if (size > 1) {
+            for (Method m : sameSignatureMethods) {
+                if (isMatch(m.getParameterTypes(), args)) {
+                    return m;
+                }
             }
         }
 
@@ -150,11 +167,7 @@ public class Application {
     }
 
     private boolean isMatch(Class<?>[] types, List<Object> args) throws ClassNotFoundException {
-        if (types.length != args.size()) {
-            return false;
-        }
-
-        for (int i = 0; i < types.length; i++) {
+        for (int i = 0, length = types.length; i < length; i++) {
             Class<?> type = types[i];
             Object arg = args.get(i);
 

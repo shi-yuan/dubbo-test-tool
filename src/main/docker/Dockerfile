@@ -1,7 +1,7 @@
-FROM openjdk:8-jre-alpine
+FROM openjdk:8-jdk-alpine
 
 ENV SPRING_OUTPUT_ANSI_ENABLED=ALWAYS \
-    JAVA_OPTS=""
+    JAVA_OPTS="-Xmx512m -Xms256m"
 
 RUN adduser -D -s /bin/sh dubbo
 WORKDIR /home/dubbo

@@ -12,6 +12,7 @@ import org.nlpcn.dubbotest.util.PojoUtils;
 import org.nlpcn.dubbotest.vm.ApiVM;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.http.MediaType;
@@ -51,7 +52,8 @@ public class Application {
 
     private static final int DEFAULT_TIMEOUT = 20 * 1000;
 
-    private static final ObjectMapper mapper = new ObjectMapper();
+    @Autowired
+    private ObjectMapper mapper;
 
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);
@@ -99,9 +101,6 @@ public class Application {
             List<Object> args = Optional.ofNullable(api.getArgs()).orElse(Collections.emptyList());
             Method invokeMethod = findMethod(ClassHelper.forName(api.getService()), api.getMethod(), args);
             if (invokeMethod != null) {
-                Object[] array = PojoUtils.realize(args.toArray(), invokeMethod.getParameterTypes(), invokeMethod.getGenericParameterTypes());
-
-                //
                 RegistryConfig registry = new RegistryConfig();
                 if (StringUtils.hasText(api.getAddress())) {
                     registry.setAddress(api.getAddress());
@@ -121,7 +120,7 @@ public class Application {
 
                 long start = System.currentTimeMillis();
 
-                Object result = reference.get().$invoke(api.getMethod(), Arrays.stream(invokeMethod.getParameterTypes()).map(Class::getName).toArray(String[]::new), array);
+                Object result = reference.get().$invoke(api.getMethod(), Arrays.stream(invokeMethod.getParameterTypes()).map(Class::getName).toArray(String[]::new), args.toArray());
 
                 LOG.info("invoke method[{}.{}], took {}ms", api.getService(), api.getMethod(), System.currentTimeMillis() - start);
 

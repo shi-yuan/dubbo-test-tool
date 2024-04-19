@@ -117,6 +117,8 @@ public class Application {
                     reference.setUrl(api.getUrl());
                 }
                 reference.setTimeout(Optional.ofNullable(api.getTimeout()).orElse(DEFAULT_TIMEOUT));
+                Optional.ofNullable(api.getVersion()).ifPresent(reference::setVersion);
+                Optional.ofNullable(api.getGroup()).ifPresent(reference::setGroup);
 
                 long start = System.currentTimeMillis();
 
